@@ -207,3 +207,17 @@ Tuning knobs: `INITIAL_MOVES` (32) and `MOVES_PURCHASE_AMOUNT` (10) in app.js; `
 - **Primary buttons** — the glossy green `btn_default.svg` pill is recreated in pure CSS (dark-green ring, bright top edge, top sheen, drop shadow) and applied to every modal primary button and the home Level button, so they all match. The home button keeps its sparkle/glow.
 - **Bottom navigation** is recreated in pure CSS (purple light-to-dark gradient, beveled dividers, rounded top corners, lighter raised Home tab) so it scales cleanly on any width. Nav icons unchanged.
 - **Modal theming unified** — on hard/super/ultra levels, the pre-level, win, and lose modals all pick up that octopus colour; on normal levels all three use the green theme.
+
+## UI polish pass
+
+- **Level button** text is now centered (label wrapped and grid-centered; removed the asymmetric bottom padding that pushed it up).
+- **Pre-level headings** ("Goal", "Select boosters") now render in Nunito instead of Bubblegum.
+- **Lose modal moves-inset** dropped its cream styling and now follows the modal theme (light green normally; lighter blue/gold/red on hard/super/ultra). Fixed a specificity bug so the **goal card** also recolors correctly per theme.
+- **Level button pulse** — added a subtle, slow pill-shaped pulse (a faint ring expanding outward over a soft green halo), layered with the existing glow and sparkle particles, and disabled under reduced-motion.
+
+## Button & theme polish
+
+- **Level button** text is now reliably centered (label wrapped + grid centering; removed the asymmetric bottom padding).
+- **Pre-level "Goal" / "Select boosters"** headings are in Nunito (the body font); the goal text was already Nunito.
+- **moves-inset** (lose modal) and **goal-card-modal** now follow the modal theme — a lighter shade of the modal colour, including hard/super/ultra (fixed a specificity bug where the themed override was being beaten by the base rule, and removed the leftover cream).
+- **Level button pulse** — a faint pill-shaped ring riding on a soft glow halo, both expanding outward and fading, kept subtle and slow, layered with the existing glow and sparkle particles. Disabled under prefers-reduced-motion.

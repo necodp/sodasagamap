@@ -3,6 +3,17 @@
 
   const DEG = Math.PI / 180;
 
+  // ---- Tunable levers ----------------------------------------------------
+  const REVEAL_MS = 400;          // level-up island rise duration (ms)
+  const REVEAL_OVERSHOOT = 1.45;  // easeOutBack strength → the little bounce at the top
+  const LABEL_POP_MS = 300;       // pin-number animate-in after the island settles
+  const OCTO_DIVE_DEPTH = 0.72;   // how far a tapped octopus ducks under (was 1.55)
+  const OCTO_DIVE_MS = 2100;      // octopus dive total duration (ms)
+  const SHIP_SCALE = 1.0;         // overall end-of-map ship size lever
+
+  function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+  function easeOutBack(t, s) { const c1 = (s == null ? 1.70158 : s); const c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); }
+
   function mulberry32(seed) {
     let a = seed >>> 0;
     return function next() {
@@ -442,6 +453,7 @@
         this.createLabels();
         this.rebuildGeometry();
         this.setupOctopi();
+        this.setupShip();
         this.bindEvents();
         this.resize();
         this.tick = this.tick.bind(this);
@@ -901,6 +913,11 @@
       this.underwaterCount = 0;
       this.waterBuffer = gl.createBuffer();
       this.waterCount = 0;
+      this.revealBuffer = gl.createBuffer();
+      this.revealCount = 0;
+      this.reveal = null;
+      this.revealRise = 0;
+      this.labelPop = null;
       this.rebuildWaterGeometry();
 
       gl.useProgram(this.program);
@@ -1026,10 +1043,60 @@
 
     setCurrentLevel(levelId) {
       if (this.currentLevel === levelId) return;
+      const prev = this.currentLevel;
       this.currentLevel = levelId;
       this.updateLabelsStatus();
       this.updateFallbackStatus();
-      this.rebuildGeometry();
+      // Advancing to a new level: play the reveal (the new island rises from the
+      // depths to the surface). Other changes (jump back, reduced motion) snap.
+      if (levelId > prev && this.gl && !this.reduceMotion) {
+        this.startReveal(levelId, prev);
+      } else {
+        this.reveal = null;
+        this.revealCount = 0;
+        this.labelPop = null;
+        this.rebuildGeometry();
+      }
+    }
+
+    // Prepare the level-up reveal: rebuild the main geometry WITHOUT the new
+    // level (so it isn't drawn twice), and stage that island in its own buffer
+    // at the surface. A per-frame Y offset (revealRise) starts it underwater and
+    // eases it up; the rise itself only begins once the camera has arrived.
+    startReveal(levelId, prev) {
+      const level = this.levels.find((l) => l.id === levelId);
+      if (!level) { this.rebuildGeometry(); return; }
+      const nOld = Math.max(1, levelId - prev);
+      const sinkOld = clamp(0.95 + (nOld - 1) * 0.42, 0.95, 2.4);
+      const fromOffset = -(sinkOld - this.activeDrop);   // depth it sat at while locked
+      this.reveal = { id: levelId, start: null, dur: REVEAL_MS, fromOffset };
+      this.revealRise = fromOffset;
+      this.labelPop = null;
+      this.buildRevealIsland(level);
+      this.rebuildGeometry(levelId);
+    }
+
+    buildRevealIsland(level) {
+      if (!this.gl) return;
+      const builder = new GeometryBuilder();
+      const scale = level.s || 1;
+      const rx = 0.82 * scale;
+      const rz = 0.66 * scale;
+      let topColor = hexToRgba("#8af6ff");
+      let tierColor = hexToRgba("#37d4e6");
+      const dividerColor = hexToRgba("#8a3b46");
+      const bottomColor = hexToRgba("#f5901c");
+      if (level.diff) {
+        const dh = level.diff === "hard" ? "#2aa8ff" : level.diff === "super" ? "#ffd23f" : "#ff4d4d";
+        topColor = hexToRgba(dh);
+        tierColor = hexToRgba(dh);
+      }
+      const dy = -this.activeDrop;
+      builder.addHexPrism(level.x, level.z, rx * 1.12, rz * 1.10, 0.16 + dy, -0.62 + dy, topColor, tierColor, dividerColor, bottomColor, null);
+      const arr = builder.opaque;
+      this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.revealBuffer);
+      this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(arr), this.gl.STATIC_DRAW);
+      this.revealCount = arr.length / 12;
     }
 
     scrollToLevel(levelId, immediate = false) {
@@ -1118,7 +1185,7 @@
       return { sink, fade, alpha, underwater: true };
     }
 
-    rebuildGeometry() {
+    rebuildGeometry(skipId) {
       if (!this.gl) return;
       const builder = new GeometryBuilder();
       const sorted = this.levels.slice().sort((a, b) => b.z - a.z);
@@ -1136,6 +1203,7 @@
       builder.triangle(builder.opaque, [-fX, floorY, fZmin], [fX, floorY, fZmax], [-fX, floorY, fZmax], [0, 1, 0], floorColor);
 
       sorted.forEach((level) => {
+        if (skipId != null && level.id === skipId) return;
         const status = this.statusFor(level.id);
         const palette = this.palette[(level.id - 1) % this.palette.length];
         const scale = level.s || 1;
@@ -1383,6 +1451,238 @@
       });
     }
 
+    // ---- End-of-map celebratory ship (a stylized galleon) -----------------
+    shipPush(arr, p, n, c) {
+      const nn = normalize(n);
+      arr.push(p[0], p[1], p[2], nn[0], nn[1], nn[2], c[0], c[1], c[2], c.length > 3 ? c[3] : 1, 0, 0);
+    }
+    shipQuad(arr, a, b, c, d, color) {
+      const n = normalize(cross(subtract(b, a), subtract(d, a)));
+      this.shipPush(arr, a, n, color); this.shipPush(arr, b, n, color); this.shipPush(arr, c, n, color);
+      this.shipPush(arr, a, n, color); this.shipPush(arr, c, n, color); this.shipPush(arr, d, n, color);
+    }
+    shipBox(arr, x0, y0, z0, x1, y1, z1, color) {
+      const top = brighten(color, 0.12), bot = darken(color, 0.20), bk = darken(color, 0.08);
+      this.shipQuad(arr, [x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0], top);
+      this.shipQuad(arr, [x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], bot);
+      this.shipQuad(arr, [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], color);
+      this.shipQuad(arr, [x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], bk);
+      this.shipQuad(arr, [x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], color);
+      this.shipQuad(arr, [x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], color);
+    }
+    shipTube(arr, a, b, r, color, segs) {
+      segs = segs || 8;
+      const axn = normalize(subtract(b, a));
+      const up = Math.abs(axn[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
+      const u = normalize(cross(axn, up)), w = normalize(cross(axn, u));
+      const ring = (cen, aa) => [cen[0] + r * (Math.cos(aa) * u[0] + Math.sin(aa) * w[0]), cen[1] + r * (Math.cos(aa) * u[1] + Math.sin(aa) * w[1]), cen[2] + r * (Math.cos(aa) * u[2] + Math.sin(aa) * w[2])];
+      const nrm = (aa) => normalize([Math.cos(aa) * u[0] + Math.sin(aa) * w[0], Math.cos(aa) * u[1] + Math.sin(aa) * w[1], Math.cos(aa) * u[2] + Math.sin(aa) * w[2]]);
+      for (let j = 0; j < segs; j += 1) {
+        const a0 = (j / segs) * 2 * Math.PI, a1 = ((j + 1) / segs) * 2 * Math.PI;
+        const A = ring(a, a0), B = ring(a, a1), C = ring(b, a1), D = ring(b, a0);
+        const n0 = nrm(a0), n1 = nrm(a1);
+        this.shipPush(arr, A, n0, color); this.shipPush(arr, B, n1, color); this.shipPush(arr, C, n1, color);
+        this.shipPush(arr, A, n0, color); this.shipPush(arr, C, n1, color); this.shipPush(arr, D, n0, color);
+      }
+    }
+    // A billowed square sail in the X-Y plane, bellying toward +z (the camera).
+    shipSail(arr, xL, xR, yTop, yBot, belly, color) {
+      const gx = 5, gy = 5;
+      const shade = darken(color, 0.05);
+      const P = (i, j) => {
+        const u = i / gx, v = j / gy;
+        const x = lerp(xL, xR, u), y = lerp(yTop, yBot, v);
+        const z = belly * Math.sin(Math.PI * u) * Math.sin(Math.PI * (0.18 + 0.82 * v));
+        return [x, y, z];
+      };
+      for (let i = 0; i < gx; i += 1) for (let j = 0; j < gy; j += 1) {
+        this.shipQuad(arr, P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i, j + 1), j % 2 === 0 ? color : shade);
+      }
+    }
+
+    buildShip(arr, flagArr) {
+      const hull = hexToRgba("#8a5a30");
+      const hullDark = hexToRgba("#6f4623");
+      const deck = hexToRgba("#b07d45");
+      const rail = hexToRgba("#5c3a1e");
+      const mast = hexToRgba("#7a4f28");
+      const spar = hexToRgba("#6f4624");
+      const sail = hexToRgba("#f3ead1");
+      const win = hexToRgba("#241a10");
+      const xb = -1.15, xs = 1.05, xMid = (xb + xs) / 2, halfLen = (xs - xb) / 2;
+      const ss = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+      const hw = (x) => {
+        const t = (x - xb) / (xs - xb);
+        const bow = ss(0.0, 0.16, t);             // pinch to a prow at the bow
+        const stern = 1 - 0.32 * ss(0.80, 1.0, t); // slight taper to the transom
+        return 0.42 * bow * stern + 0.03;
+      };
+      const yb = (x) => -0.34 + 0.34 * Math.pow((x - xMid) / halfLen, 2);   // keel: dips mid, rises at ends
+      const yt = (x) => 0.24 + 0.17 * Math.pow((x - xMid) / halfLen, 2);    // sheer: rises at bow + stern
+
+      // Hull: lofted cross-sections, the sides split into planks (alternating browns).
+      const N = 18, planks = 4;
+      for (let i = 0; i < N; i += 1) {
+        const x0 = lerp(xb, xs, i / N), x1 = lerp(xb, xs, (i + 1) / N);
+        const w0 = hw(x0), w1 = hw(x1), b0 = yb(x0), b1 = yb(x1), t0 = yt(x0), t1 = yt(x1);
+        for (let s = 0; s < 2; s += 1) {
+          const zs = s === 0 ? 1 : -1;
+          for (let k = 0; k < planks; k += 1) {
+            const ya0 = lerp(b0, t0, k / planks), ya1 = lerp(b0, t0, (k + 1) / planks);
+            const yc0 = lerp(b1, t1, k / planks), yc1 = lerp(b1, t1, (k + 1) / planks);
+            const col = k % 2 === 0 ? hull : hullDark;
+            this.shipQuad(arr, [x0, ya0, w0 * zs], [x1, yc0, w1 * zs], [x1, yc1, w1 * zs], [x0, ya1, w0 * zs], col);
+          }
+        }
+        // keel underside
+        this.shipQuad(arr, [x0, b0, -w0], [x1, b1, -w1], [x1, b1, w1], [x0, b0, w0], hullDark);
+        // deck surface (closes the top)
+        this.shipQuad(arr, [x0, t0, -w0], [x1, t1, -w1], [x1, t1, w1], [x0, t0, w0], deck);
+        // top rail trim, both sides
+        this.shipQuad(arr, [x0, t0, w0], [x1, t1, w1], [x1, t1 + 0.04, w1], [x0, t0 + 0.04, w0], rail);
+        this.shipQuad(arr, [x0, t0, -w0], [x1, t1, -w1], [x1, t1 + 0.04, -w1], [x0, t0 + 0.04, -w0], rail);
+      }
+      // transom (stern cap) + bow cap
+      this.shipQuad(arr, [xs, yb(xs), -hw(xs)], [xs, yb(xs), hw(xs)], [xs, yt(xs), hw(xs)], [xs, yt(xs), -hw(xs)], hullDark);
+
+      // Raised stern castle with three windows on the broadside (+z).
+      const cz = hw(0.78) - 0.01;
+      this.shipBox(arr, 0.52, yt(0.7) - 0.02, -cz, 0.98, 0.6, cz, hull);
+      for (let wI = 0; wI < 3; wI += 1) {
+        const wx = 0.6 + wI * 0.16;
+        this.shipQuad(arr, [wx, 0.30, cz + 0.005], [wx + 0.1, 0.30, cz + 0.005], [wx + 0.1, 0.45, cz + 0.005], [wx, 0.45, cz + 0.005], win);
+      }
+
+      // Masts (deck-stepped vertical poles).
+      this.shipTube(arr, [-0.5, 0.18, 0], [-0.5, 1.62, 0], 0.035, mast, 8);   // foremast
+      this.shipTube(arr, [0.1, 0.2, 0], [0.1, 2.05, 0], 0.044, mast, 9);      // mainmast
+      this.shipTube(arr, [0.74, 0.58, 0], [0.74, 1.66, 0], 0.034, mast, 8);   // mizzen (on the castle)
+      // Bowsprit (angled spar off the bow).
+      this.shipTube(arr, [-1.0, 0.32, 0], [-1.72, 0.66, 0], 0.03, spar, 7);
+
+      // Yards (horizontal spars) + the cream sails hanging beneath them.
+      const yard = (xc, half, y, r) => this.shipTube(arr, [xc - half, y, 0], [xc + half, y, 0], r || 0.022, spar, 6);
+      // mainmast: two stacked square sails
+      yard(0.1, 0.46, 1.55, 0.024); this.shipSail(arr, -0.34, 0.54, 1.5, 1.02, 0.19, sail);
+      yard(0.1, 0.34, 1.96, 0.02);  this.shipSail(arr, -0.22, 0.42, 1.92, 1.6, 0.15, sail);
+      // foremast: one square sail
+      yard(-0.5, 0.34, 1.42, 0.02); this.shipSail(arr, -0.82, -0.18, 1.38, 0.96, 0.16, sail);
+      // mizzen: one sail
+      yard(0.74, 0.28, 1.58, 0.02); this.shipSail(arr, 0.48, 1.0, 1.54, 1.12, 0.14, sail);
+      // bowsprit jib (a small triangular head-sail)
+      this.shipPush(arr, [-1.0, 0.32, 0], [0, 0, 1], sail);
+      this.shipPush(arr, [-1.66, 0.62, 0], [0, 0, 1], sail);
+      this.shipPush(arr, [-1.04, 0.96, 0], [0, 0, 1], sail);
+
+      // One pennant template, centred at the origin (attach point), extending +x,
+      // so it can be hung at each masthead and fluttered about its pole.
+      const flagRed = hexToRgba("#d2452f");
+      const flagDk = hexToRgba("#b23522");
+      const fp = (x, y) => [x, y, 0.02 * Math.sin(x * 7)];
+      this.shipPush(flagArr, fp(0, 0.04), [0, 0, 1], flagRed); this.shipPush(flagArr, fp(0, -0.12), [0, 0, 1], flagDk); this.shipPush(flagArr, fp(0.34, -0.04), [0, 0, 1], flagRed);
+      this.shipPush(flagArr, fp(0, 0.04), [0, 0, 1], flagRed); this.shipPush(flagArr, fp(0.34, -0.04), [0, 0, 1], flagRed); this.shipPush(flagArr, fp(0.16, 0.08), [0, 0, 1], flagDk);
+    }
+
+    buildShipGlow(arr) {
+      // Soft warm disc on the water around the ship (celebratory halo).
+      const segs = 40, r = 1.7;
+      const cen = [0, 0.02, 0];
+      const inner = hexToRgba("#ffe6ac", 0.5);
+      const outer = hexToRgba("#ffe6ac", 0.0);
+      for (let j = 0; j < segs; j += 1) {
+        const a0 = (j / segs) * 2 * Math.PI, a1 = ((j + 1) / segs) * 2 * Math.PI;
+        const p0 = [Math.cos(a0) * r, 0.02, Math.sin(a0) * r * 0.7];
+        const p1 = [Math.cos(a1) * r, 0.02, Math.sin(a1) * r * 0.7];
+        this.shipPush(arr, cen, [0, 1, 0], inner); this.shipPush(arr, p0, [0, 1, 0], outer); this.shipPush(arr, p1, [0, 1, 0], outer);
+      }
+    }
+
+    setupShip() {
+      if (!this.gl || !this.levels || this.levels.length < 2) return;
+      const sorted = this.levels.slice().sort((a, b) => a.id - b.id);
+      const last = sorted[sorted.length - 1];
+      const prev = sorted[sorted.length - 2];
+      const stepZ = last.z - prev.z;       // "forward" direction (negative: into the distance)
+      this.shipPos = {
+        x: clamp(last.x * 0.5, -0.45, 0.45),
+        z: last.z + stepZ * 0.9,
+        scale: SHIP_SCALE * 1.08            // a touch larger for the celebratory finish
+      };
+      const body = [], flags = [], glow = [];
+      this.buildShip(body, flags);
+      this.buildShipGlow(glow);
+      const gl = this.gl;
+      this.shipBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.shipBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(body), gl.STATIC_DRAW);
+      this.shipCount = body.length / 12;
+      this.flagBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.flagBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(flags), gl.STATIC_DRAW);
+      this.flagCount = flags.length / 12;
+      this.glowBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.glowBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(glow), gl.STATIC_DRAW);
+      this.glowCount = glow.length / 12;
+      // Masthead attach points for the fluttering pennants (ship-local space).
+      this.shipFlags = [
+        { x: 0.1, y: 2.05, z: 0, phase: 0.0 },
+        { x: 0.74, y: 1.66, z: 0, phase: 1.7 }
+      ];
+      this.shipModel = new Float32Array(16);
+      this.shipChild = new Float32Array(16);
+    }
+
+    drawShipBody() {
+      if (!this.shipCount || !this.shipPos) return;
+      const gl = this.gl;
+      const t = this.reduceMotion ? 0 : (performance.now() - this.startTime) * 0.001;
+      const bob = 0.05 * Math.sin(t * 0.9);
+      const roll = this.reduceMotion ? 0 : 0.05 * Math.sin(t * 0.72) + 0.02 * Math.sin(t * 1.5);
+      composeOctopusMatrix(this.shipModel, this.shipPos.x, -0.80 + bob, this.shipPos.z, roll, this.shipPos.scale);
+      gl.uniformMatrix4fv(this.locations.model, false, this.shipModel);
+      this.bindGeometry(this.shipBuffer);
+      gl.drawArrays(gl.TRIANGLES, 0, this.shipCount);
+      // Fluttering pennants: ship transform composed with a per-flag flap.
+      if (this.flagCount) {
+        this.bindGeometry(this.flagBuffer);
+        for (let i = 0; i < this.shipFlags.length; i += 1) {
+          const f = this.shipFlags[i];
+          const ang = this.reduceMotion ? 0 : 0.22 * Math.sin(t * 4.2 + f.phase) + 0.13 * Math.sin(t * 7.1 + f.phase);
+          const c = Math.cos(ang), s = Math.sin(ang);
+          const L = this.shipChild;
+          L[0] = c; L[1] = s; L[2] = 0; L[3] = 0;
+          L[4] = -s; L[5] = c; L[6] = 0; L[7] = 0;
+          L[8] = 0; L[9] = 0; L[10] = 1; L[11] = 0;
+          L[12] = f.x; L[13] = f.y; L[14] = f.z; L[15] = 1;
+          const M = new Float32Array(16);
+          multiply(M, this.shipModel, L);
+          gl.uniformMatrix4fv(this.locations.model, false, M);
+          gl.drawArrays(gl.TRIANGLES, 0, this.flagCount);
+        }
+      }
+      composeOctopusMatrix(this.shipModel, 0, 0, 0, 0, 1);
+      gl.uniformMatrix4fv(this.locations.model, false, this.shipModel);
+    }
+
+    drawShipGlow() {
+      if (!this.glowCount || !this.shipPos) return;
+      const gl = this.gl;
+      gl.useProgram(this.program);
+      gl.uniformMatrix4fv(this.locations.matrix, false, this.matrices.viewProjection);
+      if (this.locations.cameraZ) gl.uniform1f(this.locations.cameraZ, this.cameraZ);
+      gl.depthMask(false);
+      const t = this.reduceMotion ? 0 : (performance.now() - this.startTime) * 0.001;
+      const pulse = this.shipPos.scale * (1 + (this.reduceMotion ? 0 : 0.05 * Math.sin(t * 1.4)));
+      composeOctopusMatrix(this.shipModel, this.shipPos.x, -0.79, this.shipPos.z, 0, pulse);
+      gl.uniformMatrix4fv(this.locations.model, false, this.shipModel);
+      this.bindGeometry(this.glowBuffer);
+      gl.drawArrays(gl.TRIANGLES, 0, this.glowCount);
+      composeOctopusMatrix(this.shipModel, 0, 0, 0, 0, 1);
+      gl.uniformMatrix4fv(this.locations.model, false, this.shipModel);
+      gl.depthMask(true);
+    }
+
     difficultyOf(levelId) {
       const l = this.levels.find((x) => x.id === levelId);
       return l && l.diff ? l.diff : null;
@@ -1422,12 +1722,19 @@
         if (o.id <= this.currentLevel) continue;   // only submerged (upcoming) levels get a warning
         const bob = 0.07 * Math.sin(time * 1.6 + o.phase);
         const sway = 0.10 * Math.sin(time * 1.05 + o.phase * 0.7);
-        // Tap-to-dive: sink fully under, hold a beat, then ease back to the surface.
+        // Tap-to-dive: a gentle duck under the surface and back — smooth ease
+        // down, a brief hold, smooth ease back up (shallower + less linear).
         let diveY = 0;
         if (o.diveStart != null) {
-          const p = (now - o.diveStart) / 2800;
+          const p = (now - o.diveStart) / OCTO_DIVE_MS;
           if (p >= 1) { o.diveStart = null; }
-          else { diveY = -1.55 * (p < 0.26 ? ss(0, 0.26, p) : p < 0.72 ? 1 : 1 - ss(0.72, 1, p)); }
+          else {
+            let d;
+            if (p < 0.40) d = easeInOutCubic(p / 0.40);
+            else if (p < 0.58) d = 1;
+            else d = 1 - easeInOutCubic((p - 0.58) / 0.42);
+            diveY = -OCTO_DIVE_DEPTH * d;
+          }
         }
         // Sit at the surface: head above the waterline (-0.80), tentacles below.
         composeOctopusMatrix(this.octoModel, o.x, -0.55 + bob + diveY, o.z, sway, 0.78);
@@ -1458,12 +1765,29 @@
       this.bindGeometry(this.opaqueBuffer);
       if (this.opaqueCount) gl.drawArrays(gl.TRIANGLES, 0, this.opaqueCount);
 
+      // Level-up reveal: the newly-current island, lifted by a Y-offset model
+      // matrix from below the surface up to its resting place.
+      if (this.reveal && this.revealCount) {
+        const rm = this.octoModel;
+        rm[0] = 1; rm[1] = 0; rm[2] = 0; rm[3] = 0;
+        rm[4] = 0; rm[5] = 1; rm[6] = 0; rm[7] = 0;
+        rm[8] = 0; rm[9] = 0; rm[10] = 1; rm[11] = 0;
+        rm[12] = 0; rm[13] = this.revealRise; rm[14] = 0; rm[15] = 1;
+        gl.uniformMatrix4fv(this.locations.model, false, rm);
+        this.bindGeometry(this.revealBuffer);
+        gl.drawArrays(gl.TRIANGLES, 0, this.revealCount);
+        composeOctopusMatrix(rm, 0, 0, 0, 0, 1);
+        gl.uniformMatrix4fv(this.locations.model, false, rm);
+      }
+
       // Floating octopus markers above submerged (upcoming) hard levels. Drawn
       // before the water so the translucent surface is depth-rejected behind them.
+      this.drawShipBody();
       this.drawOctopi();
 
       // Translucent water surface over the submerged islands and floor.
       this.drawWater();
+      this.drawShipGlow();
 
       // Transparent details (contact shadows, current-level halo) over the water.
       gl.useProgram(this.program);
@@ -1479,37 +1803,53 @@
     updateLabelsProjection() {
       let currentProjection = null;
       let currentScale = 1;
+      let glowFade = 1;
 
       this.levels.forEach((level) => {
         const label = this.labels.get(level.id);
         if (!label) return;
-        // Numbers show only on above-water levels (completed + current). Submerged
-        // future levels show no number — the islands themselves signal what's ahead.
-        if (this.submersionFor(level).underwater) {
+        // The pin number shows on the CURRENT level only — completed and locked
+        // levels carry no number; the islands themselves signal the trail.
+        if (level.id !== this.currentLevel) {
           label.style.opacity = "0";
+          return;
+        }
+        // While the new island is still rising (or queued to), keep its number
+        // hidden — it pops in once the island has surfaced and settled.
+        if (this.pendingReveal || (this.reveal && this.reveal.id === level.id)) {
+          label.style.opacity = "0";
+          currentProjection = null;
           return;
         }
         const p = projectPoint(this.matrices.viewProjection, [level.x, 0.36 - this.activeDrop, level.z], this.width, this.height);
         if (!p || !p.visible || p.y < 80 || p.y > this.height - 80) {
           label.style.opacity = "0";
-          if (level.id === this.currentLevel) currentProjection = null;
+          currentProjection = null;
           return;
         }
+        // Pin-number animate-in: scale up from small with a soft overshoot and fade.
+        let popScale = 1;
+        let popFade = 1;
+        if (this.labelPop && this.labelPop.id === level.id) {
+          const lp = clamp((performance.now() - this.labelPop.start) / LABEL_POP_MS, 0, 1);
+          popFade = clamp(lp * 1.4, 0, 1);
+          popScale = lerp(0.35, 1, easeOutBack(lp, 2.0));
+          if (lp >= 1) this.labelPop = null;
+        }
+        glowFade = popFade;
         const screenScale = clamp(0.52 + (p.y / this.height) * 0.78, 0.58, 1.22) * (level.s || 1);
         // Distant labels (near the top of the screen) blur and fade into the mist.
         const mistEnd = this.height * 0.23;
         const mistT = clamp((mistEnd - p.y) / Math.max(1, mistEnd - 80), 0, 1);
-        label.style.opacity = (1 - mistT * 0.72).toFixed(3);
+        label.style.opacity = ((1 - mistT * 0.72) * popFade).toFixed(3);
         label.style.filter = mistT > 0.01 ? `blur(${(mistT * 3.0).toFixed(2)}px)` : "none";
         label.style.zIndex = String(Math.round(p.y) + 3);
-        label.style.transform = `translate(-50%, -50%) translate(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px) scale(${screenScale.toFixed(3)})`;
+        label.style.transform = `translate(-50%, -50%) translate(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px) scale(${(screenScale * popScale).toFixed(3)})`;
 
-        if (level.id === this.currentLevel) {
-          const glowPoint = projectPoint(this.matrices.viewProjection, [level.x, 0.19, level.z], this.width, this.height);
-          if (glowPoint && glowPoint.visible && glowPoint.y >= 80 && glowPoint.y <= this.height - 80) {
-            currentProjection = glowPoint;
-            currentScale = clamp(0.72 + (glowPoint.y / this.height) * 0.88, 0.72, 1.34) * (level.s || 1);
-          }
+        const glowPoint = projectPoint(this.matrices.viewProjection, [level.x, 0.19, level.z], this.width, this.height);
+        if (glowPoint && glowPoint.visible && glowPoint.y >= 80 && glowPoint.y <= this.height - 80) {
+          currentProjection = glowPoint;
+          currentScale = clamp(0.72 + (glowPoint.y / this.height) * 0.88, 0.72, 1.34) * (level.s || 1);
         }
       });
 
@@ -1517,10 +1857,29 @@
         if (!currentProjection) {
           this.currentGlow.style.opacity = "0";
         } else {
-          this.currentGlow.style.opacity = "1";
+          this.currentGlow.style.opacity = glowFade.toFixed(3);
           this.currentGlow.style.zIndex = String(Math.round(currentProjection.y) + 1);
           this.currentGlow.style.transform = `translate(${currentProjection.x.toFixed(1)}px, ${currentProjection.y.toFixed(1)}px) scale(${currentScale.toFixed(3)})`;
         }
+      }
+    }
+
+    updateReveal() {
+      if (!this.reveal) return;
+      if (this.reveal.start == null) {
+        // Hold the island submerged until the camera has (nearly) arrived, so
+        // the player watches it actually surface rather than missing it mid-scroll.
+        if (Math.abs(this.cameraZ - this.targetZ) < 0.16) this.reveal.start = performance.now();
+        return;
+      }
+      const p = clamp((performance.now() - this.reveal.start) / this.reveal.dur, 0, 1);
+      this.revealRise = lerp(this.reveal.fromOffset, 0, easeOutBack(p, REVEAL_OVERSHOOT));
+      if (p >= 1) {
+        const id = this.reveal.id;
+        this.reveal = null;
+        this.revealCount = 0;
+        this.rebuildGeometry();
+        this.labelPop = { id, start: performance.now() };
       }
     }
 
@@ -1528,6 +1887,7 @@
       if (!this.gl) return;
       this.resize();
       this.updateCamera();
+      this.updateReveal();
       this.draw();
       this.updateLabelsProjection();
       this.frameId = requestAnimationFrame(this.tick);

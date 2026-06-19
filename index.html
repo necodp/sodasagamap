@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Soda Flow Prototype</title>
-  <link rel="stylesheet" href="styles.css?v=ui-unify-1" />
+  <link rel="stylesheet" href="styles.css?v=section-hdr-1" />
 </head>
 
 <body>
@@ -44,6 +44,11 @@
             class="gear-icon" aria-hidden="true"></span></button>
       </header>
 
+      <div class="section-header" aria-label="Level section Bubblegum Bay">
+        <div class="section-banner"><span class="section-title">Bubblegum Bay</span></div>
+        <div class="section-counter"><span data-bind="completed">8</span>/<span data-bind="totalLevels">80</span></div>
+      </div>
+
       <div class="side-rail left" aria-label="Left feature widgets">
         <button class="side-widget" type="button" data-action="coming-soon"
           aria-label="Feature widget placeholder 1">!</button>
@@ -66,7 +71,7 @@
       </div>
 
       <button class="level-button" type="button" data-action="open-prelevel"
-        aria-label="Open current level pre-level popup"><span class="level-button-pulse" aria-hidden="true"></span><span class="level-button-label">Level <span data-bind="currentLevel">9</span></span></button>
+        aria-label="Open current level pre-level popup"><span class="level-button-octopus" aria-hidden="true"><svg viewBox="0 0 100 96" xmlns="http://www.w3.org/2000/svg"><g fill="currentColor"><ellipse cx="27" cy="82" rx="11" ry="13"/><ellipse cx="50" cy="86" rx="12" ry="14"/><ellipse cx="73" cy="82" rx="11" ry="13"/></g><path fill="currentColor" d="M50 5C25 5 11 24 11 49c0 22 16 35 39 35s39-13 39-35C89 24 75 5 50 5Z"/><ellipse cx="50" cy="60" rx="29" ry="18" fill="rgba(0,0,0,0.10)"/><circle cx="37" cy="43" r="14" fill="#fff"/><circle cx="63" cy="43" r="14" fill="#fff"/><circle cx="40" cy="46" r="6.6" fill="#15233a"/><circle cx="60" cy="46" r="6.6" fill="#15233a"/><circle cx="37.6" cy="42" r="2.3" fill="#fff"/><circle cx="57.6" cy="42" r="2.3" fill="#fff"/></svg></span><span class="level-button-label">Level <span data-bind="currentLevel">9</span></span></button>
 
       <nav class="bottom-nav" aria-label="Bottom navigation">
         <button class="nav-item" type="button" data-action="coming-soon" aria-label="Shop tab"><span
@@ -119,8 +124,8 @@
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <div id="modalLayer" class="modal-layer" hidden></div>
   </main>
-  <script src="home3d.js?v=realwater-1"></script>
-  <script src="app.js?v=ui-unify-1"></script>
+  <script src="home3d.js?v=ship-reveal-1"></script>
+  <script src="app.js?v=section-hdr-1"></script>
 </body>
 
 </html>

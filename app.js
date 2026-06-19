@@ -108,7 +108,8 @@ const els = {
   boosterTray: document.getElementById("boosterTray"),
   debugPanel: document.querySelector(".debug-panel"),
   modalLayer: document.getElementById("modalLayer"),
-  toast: document.getElementById("toast")
+  toast: document.getElementById("toast"),
+  levelButton: document.querySelector(".level-button")
 };
 
 let toastTimer = null;
@@ -144,7 +145,20 @@ function renderScreens() {
 function renderMap() {
   if (!homeMap3D) return;
   homeMap3D.update({ currentLevel: state.currentLevel });
+  updateLevelButtonDifficulty();
   if (state.screen === SCREENS.HOME) homeMap3D.resize();
+}
+
+// The home Level button mirrors the current level's difficulty: when it's a
+// hard/super/ultra level it takes the matching octopus colour and shows the
+// octopus head, becoming the entry point for that hard level.
+function updateLevelButtonDifficulty() {
+  const btn = els.levelButton;
+  if (!btn) return;
+  const diff = homeMap3D && homeMap3D.difficultyOf ? homeMap3D.difficultyOf(state.currentLevel) : null;
+  btn.classList.toggle("is-hard", diff === "hard");
+  btn.classList.toggle("is-super", diff === "super");
+  btn.classList.toggle("is-ultra", diff === "ultra");
 }
 
 function getLevelStatus(levelId) {
@@ -207,6 +221,12 @@ function renderBindings() {
   });
   document.querySelectorAll("[data-bind='moves']").forEach((node) => {
     node.textContent = state.moves;
+  });
+  document.querySelectorAll("[data-bind='completed']").forEach((node) => {
+    node.textContent = Math.max(0, Math.min(MAX_LEVEL, state.currentLevel - 1));
+  });
+  document.querySelectorAll("[data-bind='totalLevels']").forEach((node) => {
+    node.textContent = MAX_LEVEL;
   });
 }
 

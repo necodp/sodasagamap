@@ -2358,13 +2358,21 @@ summary:focus-visible {
   width: 213px;
   height: 62px;
   min-height: 0;
-  padding: 0 0 6px;
+  padding: 0;
+  display: grid;
+  place-items: center;
   border-radius: 34px;
   font-size: 22px;
   text-shadow: 0 2px 0 rgba(0, 87, 18, 0.28);
   overflow: visible;
   isolation: isolate;
   animation: levelButtonFloat 4.8s ease-in-out infinite;
+}
+
+.lb-text {
+  position: relative;
+  z-index: 2;
+  line-height: 1;
 }
 
 .level-button::before {
@@ -2537,6 +2545,8 @@ summary:focus-visible {
   .level-button,
   .level-button::before,
   .level-button::after,
+  .level-pulse::before,
+  .level-pulse::after,
   .map-current-glow::before,
   .map-current-glow::after {
     animation: none !important;
@@ -2703,7 +2713,8 @@ summary:focus-visible {
   color: #2f6fa8;
 }
 
-.theme-hard .goal-card-modal {
+.modal-card.themed.theme-hard .goal-card-modal,
+.modal-card.themed.theme-hard .moves-inset {
   background: linear-gradient(180deg, #edf7ff 0%, #dcefff 100%);
   border-color: rgba(120, 185, 255, 0.55);
 }
@@ -2730,7 +2741,8 @@ summary:focus-visible {
   color: #b9810b;
 }
 
-.theme-super .goal-card-modal {
+.modal-card.themed.theme-super .goal-card-modal,
+.modal-card.themed.theme-super .moves-inset {
   background: linear-gradient(180deg, #fff8df 0%, #fff0c2 100%);
   border-color: rgba(245, 200, 80, 0.6);
 }
@@ -2757,7 +2769,8 @@ summary:focus-visible {
   color: #c2473e;
 }
 
-.theme-ultra .goal-card-modal {
+.modal-card.themed.theme-ultra .goal-card-modal,
+.modal-card.themed.theme-ultra .moves-inset {
   background: linear-gradient(180deg, #ffece9 0%, #ffd9d3 100%);
   border-color: rgba(255, 130, 120, 0.55);
 }
@@ -3038,9 +3051,9 @@ summary:focus-visible {
   margin: 0 0 16px;
   padding: 22px 16px;
   border-radius: 20px;
-  background: linear-gradient(180deg, #f9efd2, #f1e4bd);
-  border: 2px solid #e4d09e;
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.65), inset 0 -3px 0 rgba(176, 144, 82, 0.14);
+  background: linear-gradient(180deg, #ecfbf5 0%, #ddf6ec 100%);
+  border: 2px solid rgba(118, 210, 184, 0.55);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.65), inset 0 -3px 0 rgba(36, 104, 86, 0.1);
 }
 
 .moves-icon {
@@ -3138,115 +3151,235 @@ summary:focus-visible {
     0 3px 5px rgba(0, 0, 0, 0.26);
 }
 
-/* ===== Requested polish pass: centered CTA, Nunito modal sections, themed insets ===== */
-.level-button {
-  display: inline-grid;
-  place-items: center;
-  padding: 0;
-  line-height: 1;
-  text-align: center;
-  overflow: visible;
-  isolation: isolate;
-  animation-duration: 5.2s;
-}
+/* ===== UI polish pass ===== */
 
-.level-button-label {
-  position: relative;
-  z-index: 3;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  transform: translateY(-2px);
-  pointer-events: none;
-}
-
-.level-button-pulse {
-  position: absolute;
-  z-index: -1;
-  inset: -3px;
-  border-radius: inherit;
-  pointer-events: none;
-  opacity: 0;
-  box-shadow: 0 0 0 0 rgba(170, 255, 205, 0.34), 0 0 18px rgba(110, 255, 205, 0.22);
-  animation: levelButtonPillPulse 5.2s cubic-bezier(0.19, 1, 0.22, 1) infinite;
-}
-
-.level-button::before {
-  animation-duration: 5.2s;
-}
-
-.level-button::after {
-  z-index: 2;
-  animation-duration: 5.2s;
-}
-
+/* Pre-level section headings ("Goal", "Select boosters") in Nunito. */
 .themed-section {
   font-family: var(--font-body);
-  font-weight: 700;
 }
 
-.modal-card.themed {
-  --modal-inset-bg: linear-gradient(180deg, #ecfbf5 0%, #ddf6ec 100%);
-  --modal-inset-border: rgba(118, 210, 184, 0.55);
-  --modal-inset-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.72), inset 0 -3px 0 rgba(58, 145, 120, 0.10), 0 6px 12px rgba(36, 104, 86, 0.12);
-  --modal-inset-icon-shadow: drop-shadow(0 4px 7px rgba(36, 104, 86, 0.22));
+/* Level-button pulse: a faint ring riding on a soft halo, both behind the
+   pill, expanding outward and fading. Subtle + slow; combines with the
+   existing ::before glow and ::after sparkle particles. */
+.level-pulse {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  border-radius: inherit;
+  pointer-events: none;
 }
 
-.modal-card.themed.theme-hard {
-  --modal-inset-bg: linear-gradient(180deg, #f5fbff 0%, #e5f4ff 100%);
-  --modal-inset-border: rgba(120, 185, 255, 0.55);
-  --modal-inset-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.72), inset 0 -3px 0 rgba(60, 130, 200, 0.10), 0 6px 12px rgba(30, 98, 165, 0.12);
-  --modal-inset-icon-shadow: drop-shadow(0 4px 7px rgba(30, 98, 165, 0.22));
+.level-pulse::before,
+.level-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
 }
 
-.modal-card.themed.theme-super {
-  --modal-inset-bg: linear-gradient(180deg, #fffbe8 0%, #fff3cb 100%);
-  --modal-inset-border: rgba(245, 200, 80, 0.60);
-  --modal-inset-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.72), inset 0 -3px 0 rgba(190, 130, 10, 0.11), 0 6px 12px rgba(140, 94, 10, 0.12);
-  --modal-inset-icon-shadow: drop-shadow(0 4px 7px rgba(150, 94, 10, 0.22));
+/* soft halo — breathing aura around the pill */
+.level-pulse::before {
+  animation: levelHalo 4.6s ease-in-out infinite;
 }
 
-.modal-card.themed.theme-ultra {
-  --modal-inset-bg: linear-gradient(180deg, #fff0ed 0%, #ffe0dc 100%);
-  --modal-inset-border: rgba(255, 130, 120, 0.55);
-  --modal-inset-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.72), inset 0 -3px 0 rgba(190, 64, 55, 0.10), 0 6px 12px rgba(150, 52, 46, 0.12);
-  --modal-inset-icon-shadow: drop-shadow(0 4px 7px rgba(150, 52, 46, 0.22));
+/* faint ring — expands out from the pill edge */
+.level-pulse::after {
+  box-shadow: 0 0 0 1.5px rgba(178, 255, 198, 0.6);
+  animation: levelRing 4.6s ease-out infinite;
 }
 
-.modal-card.themed .goal-card-modal,
-.modal-card.themed .moves-inset {
-  background: var(--modal-inset-bg);
-  border-color: var(--modal-inset-border);
-  box-shadow: var(--modal-inset-shadow);
-}
+@keyframes levelHalo {
 
-.modal-card.themed .moves-icon {
-  filter: var(--modal-inset-icon-shadow);
-}
-
-@keyframes levelButtonPillPulse {
   0%,
   100% {
     opacity: 0;
-    transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(170, 255, 205, 0), 0 0 14px rgba(110, 255, 205, 0);
+    box-shadow: 0 0 6px 0 rgba(150, 255, 178, 0);
   }
 
-  12% {
-    opacity: 0.36;
-    box-shadow: 0 0 0 2px rgba(170, 255, 205, 0.28), 0 0 18px rgba(110, 255, 205, 0.22);
-  }
-
-  58% {
-    opacity: 0;
-    transform: scale(1.23);
-    box-shadow: 0 0 0 18px rgba(170, 255, 205, 0), 0 0 30px rgba(110, 255, 205, 0);
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 14px 3px rgba(150, 255, 178, 0.5);
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .level-button-pulse {
-    animation: none !important;
+@keyframes levelRing {
+  0% {
+    opacity: 0;
+    transform: scale(1);
   }
+
+  16% {
+    opacity: 0.5;
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.18);
+    box-shadow: 0 0 0 1.5px rgba(178, 255, 198, 0);
+  }
+}
+
+/* ===== Level-button rework pass =====
+   1) Centering fix — the pulse span that used to take a grid row is gone, so the
+      label centers; we just pin line-height + stacking. 2) Particles stripped:
+      no sparkle dots anywhere, no button glow/float; the current-level halo stays
+      but is now static (no animation). 3) Hard/super/ultra: the button takes the
+      matching octopus colour (a touch brighter) with a head peeking over the top. */
+
+/* (1) centering */
+.level-button-label {
+  position: relative;
+  z-index: 2;
+  line-height: 1;
+}
+
+/* (2) kill the sparkle/glow particles + the button float */
+.level-button {
+  animation: none;
+}
+
+.level-button::before,
+.level-button::after {
+  content: none;
+  display: none;
+}
+
+.map-current-glow::after {
+  display: none;
+}
+
+/* sparkle dots gone */
+.map-current-glow::before {
+  animation: none;
+}
+
+/* glow kept, now static */
+
+/* (3a) octopus head — hidden by default, peeking over the top edge when shown */
+.level-button-octopus {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% - 14px);
+  transform: translateX(-50%);
+  width: 64px;
+  height: 60px;
+  z-index: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.26));
+}
+
+.level-button-octopus svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* (3b) difficulty colours — brighter octopus palette + readable gloss */
+.level-button.is-hard,
+.level-button.is-super,
+.level-button.is-ultra {
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -8px 12px rgba(0, 0, 0, 0.2),
+    0 7px 9px rgba(0, 0, 0, 0.28);
+}
+
+.level-button.is-hard {
+  background: linear-gradient(180deg, #6cc6ff 0%, #2aa8ff 52%, #1789d6 100%);
+  border-color: #0e6aa6;
+}
+
+.level-button.is-super {
+  background: linear-gradient(180deg, #ffe488 0%, #ffd23f 52%, #efa91c 100%);
+  border-color: #c9851a;
+  text-shadow: 0 2px 0 rgba(120, 72, 4, 0.55), 0 3px 5px rgba(0, 0, 0, 0.22);
+}
+
+.level-button.is-ultra {
+  background: linear-gradient(180deg, #ff7d72 0%, #ff4d4d 52%, #d63030 100%);
+  border-color: #b22f2f;
+}
+
+.level-button.is-hard .level-button-octopus {
+  display: block;
+  color: #2aa8ff;
+}
+
+.level-button.is-super .level-button-octopus {
+  display: block;
+  color: #ffd23f;
+}
+
+.level-button.is-ultra .level-button-octopus {
+  display: block;
+  color: #ff4d4d;
+}
+
+/* respect reduced motion (glow already static; nothing else to disable here) */
+
+/* ===== Section header (below the top HUD) =====
+   "Bubblegum Bay" banner (Bubblegum Bliss) with a completed/total counter
+   (Nunito) tucked under its lower edge. Purely informational, so it never
+   eats pointer events meant for dragging the map. */
+.section-header {
+  position: absolute;
+  z-index: 23;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  pointer-events: none;
+}
+
+.section-banner {
+  min-width: 278px;
+  max-width: 78vw;
+  padding: 6px 28px 9px;
+  border-radius: 15px;
+  background: linear-gradient(180deg, #ad3768 0%, #8a2a55 100%);
+  border: 2.5px solid rgba(255, 184, 217, 0.5);
+  box-shadow:
+    0 6px 0 rgba(82, 23, 65, 0.3),
+    0 11px 16px rgba(80, 17, 82, 0.3),
+    inset 0 2px 0 rgba(255, 255, 255, 0.14);
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 27px;
+  line-height: 1;
+  color: #fff1da;
+  letter-spacing: 0.5px;
+  text-shadow:
+    -1px -1px 0 rgba(90, 18, 66, 0.5),
+    1px -1px 0 rgba(90, 18, 66, 0.5),
+    -1px 1px 0 rgba(90, 18, 66, 0.5),
+    1px 1px 0 rgba(90, 18, 66, 0.5),
+    0 2px 0 rgba(88, 16, 64, 0.6),
+    0 4px 5px rgba(0, 0, 0, 0.22);
+}
+
+.section-counter {
+  position: relative;
+  z-index: 1;
+  margin-top: -9px;
+  padding: 3px 18px 4px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #7a2950 0%, #5d1e3e 100%);
+  border: 2px solid rgba(255, 184, 217, 0.4);
+  box-shadow:
+    0 3px 6px rgba(55, 10, 46, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1;
+  color: #fff;
+  letter-spacing: 0.5px;
 }
