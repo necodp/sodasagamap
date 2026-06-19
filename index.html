@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Soda Flow Prototype</title>
+  <link rel="stylesheet" href="styles.css?v=ui-unify-1" />
+</head>
+
+<body>
+  <main class="phone" aria-label="Soda flow mobile prototype">
+    <div class="phone-status" aria-hidden="true"><span>9:41</span><span>5G 100%</span></div>
+
+    <section id="homeScreen" class="screen home-screen is-active" aria-label="Saga map home screen">
+      <div class="home-bg" aria-hidden="true">
+        <span class="sun-glow"></span>
+        <span class="cloud cloud-left"></span>
+        <span class="cloud cloud-right"></span>
+        <span class="horizon-line"></span>
+        <span class="sea-shine shine-a"></span>
+        <span class="sea-shine shine-b"></span>
+      </div>
+
+      <div id="mapScroll" class="map-scroll" aria-label="Draggable 3D soda sea saga map">
+        <canvas id="mapCanvas" class="map-canvas" aria-hidden="true"></canvas>
+        <div id="mapLabels" class="map-labels" aria-hidden="true"></div>
+        <span class="map-mist" aria-hidden="true"></span>
+        <p id="mapError" class="map-error" hidden>3D map unavailable</p>
+      </div>
+
+      <header class="top-hud" aria-label="Home resources">
+        <div class="stat-pill lives" aria-label="4 lives, timer 14 minutes 25 seconds">
+          <span class="plus-dot" aria-hidden="true">+</span>
+          <span class="heart-icon" aria-hidden="true">4</span>
+          <span class="timer-text">14:25</span>
+        </div>
+        <div class="stat-pill gold" aria-label="50 gold bars">
+          <span class="plus-dot" aria-hidden="true">+</span>
+          <span class="gold-icon" aria-hidden="true"></span>
+          <span class="gold-count">50</span>
+        </div>
+        <button class="settings-button" type="button" data-action="coming-soon" aria-label="Settings placeholder"><span
+            class="gear-icon" aria-hidden="true"></span></button>
+      </header>
+
+      <div class="side-rail left" aria-label="Left feature widgets">
+        <button class="side-widget" type="button" data-action="coming-soon"
+          aria-label="Feature widget placeholder 1">!</button>
+        <button class="side-widget" type="button" data-action="coming-soon"
+          aria-label="Feature widget placeholder 2">+</button>
+        <button class="side-widget" type="button" data-action="coming-soon"
+          aria-label="Feature widget placeholder 3">?</button>
+        <button class="side-widget" type="button" data-action="coming-soon"
+          aria-label="Feature widget placeholder 4">*</button>
+      </div>
+      <div class="side-rail right" aria-label="Right feature widgets">
+        <button class="side-widget" type="button" data-action="coming-soon"
+          aria-label="Feature widget placeholder 5">!</button>
+        <button class="side-widget" type="button" data-action="coming-soon"
+          aria-label="Feature widget placeholder 6">+</button>
+        <button class="side-widget" type="button" data-action="coming-soon"
+          aria-label="Feature widget placeholder 7">?</button>
+        <button class="side-widget" type="button" data-action="coming-soon"
+          aria-label="Feature widget placeholder 8">*</button>
+      </div>
+
+      <button class="level-button" type="button" data-action="open-prelevel"
+        aria-label="Open current level pre-level popup"><span class="level-button-pulse" aria-hidden="true"></span><span class="level-button-label">Level <span data-bind="currentLevel">9</span></span></button>
+
+      <nav class="bottom-nav" aria-label="Bottom navigation">
+        <button class="nav-item" type="button" data-action="coming-soon" aria-label="Shop tab"><span
+            class="nav-icon shop" aria-hidden="true"></span><span class="nav-label">Shop</span></button>
+        <button class="nav-item" type="button" data-action="coming-soon" aria-label="Social tab"><span
+            class="nav-icon social" aria-hidden="true"></span><span class="nav-label">Social</span></button>
+        <button class="nav-item is-selected" type="button" data-action="scroll-current"
+          aria-label="Home tab selected"><span class="nav-icon home" aria-hidden="true"></span><span
+            class="nav-label">Home</span></button>
+        <button class="nav-item" type="button" data-action="coming-soon" aria-label="Teams tab"><span
+            class="nav-icon teams" aria-hidden="true"></span><span class="nav-label">Teams</span></button>
+        <button class="nav-item" type="button" data-action="coming-soon" aria-label="Activities tab"><span
+            class="nav-icon activities" aria-hidden="true"></span><span class="nav-label">Activities</span></button>
+      </nav>
+    </section>
+
+    <section id="boardScreen" class="screen board-screen" aria-label="Match-3 board placeholder">
+      <div class="board-bg-shine" aria-hidden="true"></div>
+      <header class="game-hud" aria-label="Level HUD">
+        <div class="hud-pill">
+          <div class="hud-slot">
+            <span class="hud-cap">Moves</span>
+            <div class="hud-inset"><strong data-bind="moves">32</strong></div>
+          </div>
+          <div class="hud-slot">
+            <span class="hud-cap">Goal</span>
+            <div class="hud-inset goal-inset">
+              <img class="goal-jar" src="assets/inGame/goal.png" alt="" draggable="false" />
+              <strong>70</strong>
+            </div>
+          </div>
+          <div class="hud-bear"><img class="hud-bear-img" src="assets/inGame/sitting_bear.png" alt="" draggable="false" /></div>
+        </div>
+      </header>
+      <div class="board-stage">
+        <div id="boardGrid" class="board-grid" role="grid" aria-label="Match-3 board"></div>
+        <footer class="game-dock" aria-label="In-game boosters">
+          <div class="booster-tray" id="boosterTray"></div>
+          <button class="settings-gear" type="button" aria-label="Settings"><img src="assets/inGame/new_settings.svg" alt="" draggable="false" /></button>
+        </footer>
+      </div>
+      <details class="debug-panel">
+        <summary>Debug controls</summary>
+        <div class="debug-buttons"><button class="debug-button win" type="button" data-action="win-level">Win
+            level</button><button class="debug-button lose" type="button" data-action="lose-level">Lose level</button>
+        </div>
+      </details>
+    </section>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <div id="modalLayer" class="modal-layer" hidden></div>
+  </main>
+  <script src="home3d.js?v=realwater-1"></script>
+  <script src="app.js?v=ui-unify-1"></script>
+</body>
+
+</html>
